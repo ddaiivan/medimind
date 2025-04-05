@@ -22,14 +22,14 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
     const svgWidth = mindmapContainer.clientWidth || 600;
     const svgHeight = mindmapContainer.clientHeight || 500;
     const svg = mindmapSvg.attr('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
-    const g = svg.append('g'); // Main group for content
+    const g = svg.append('g');
 
     // --- State Variables ---
     let currentMindmapData = null;
     let selectedNodeData = null;
     let selectedNodeElement = null;
     let editingNodeData = null;
-    let isInitialRender = true; // Flag for initial centering/zoom
+    let isInitialRender = true;
 
     // --- Configuration ---
     const nodeRectWidth = 150;
@@ -40,21 +40,24 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
 
     // --- D3 Zoom Behavior ---
     const zoom = d3.zoom().scaleExtent([0.1, 3]).on('zoom', (event) => {
-        g.attr('transform', event.transform); // Apply zoom transform to the main group
+        g.attr('transform', event.transform);
         contextMenu.style.display = 'none';
         nodeEditInput.style.display = 'none';
     });
-    svg.call(zoom).on("dblclick.zoom", null); // Attach zoom listener to SVG
+    svg.call(zoom).on("dblclick.zoom", null);
 
-    // --- Helper: Text Wrapping (Reverted to simpler version) ---
+    // --- Helper: Text Wrapping (Reverted to simpler version with text-anchor) ---
     function wrapTextInsideNode(textSelection, width) {
       textSelection.each(function() {
         const text = d3.select(this);
         const words = text.text().split(/\s+/).reverse();
         let word; let line = []; let lineNumber = 0;
         const lineHeight = 1.1; const dy = parseFloat(text.attr("dy") || 0);
-        text.attr("y", null).text(null);
-        let tspan = text.append("tspan").attr("x", 0).attr("dy", dy + "em");
+        text.attr("y", null).text(null); // Clear y and text
+        // Set text-anchor middle and x=0 here for default centering
+        text.style("text-anchor", "middle").attr("x", 0);
+
+        let tspan = text.append("tspan").attr("x", 0).attr("dy", dy + "em"); // x=0 relative to centered text element
         while (word = words.pop()) {
           line.push(word); tspan.text(line.join(" "));
           if (tspan.node().getComputedTextLength() > width && line.length > 1) {
@@ -63,6 +66,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
             lineNumber++;
           }
         }
+        // Vertical centering based on lines
         const lines = lineNumber + 1;
         text.attr("y", -( (lines - 1) * lineHeight / 2 ) + "em" );
       });
@@ -77,16 +81,17 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         selectedNodeElement = element; selectedNodeData = d;
         d3.select(selectedNodeElement).select('rect').style('stroke', 'red').style('stroke-width', '2px');
         const nodeRect = d3.select(element).select('rect').node(); if (!nodeRect) return;
+        const containerRect = mindmapContainer.getBoundingClientRect();
         const svgPointTL = mindmapSvg.node().createSVGPoint(); svgPointTL.x = parseFloat(nodeRect.getAttribute('x')); svgPointTL.y = parseFloat(nodeRect.getAttribute('y'));
         const svgPointBR = mindmapSvg.node().createSVGPoint(); svgPointBR.x = svgPointTL.x + parseFloat(nodeRect.getAttribute('width')); svgPointBR.y = svgPointTL.y + parseFloat(nodeRect.getAttribute('height'));
         const matrix = element.getScreenCTM(); if (!matrix) { console.error("Could not get screen CTM."); return; }
         const screenPointTL = svgPointTL.matrixTransform(matrix); const screenPointBR = svgPointBR.matrixTransform(matrix);
-        const menuMargin = 5; let finalLeft = screenPointBR.x + menuMargin; let finalTop = screenPointTL.y;
+        const menuMargin = 8; let menuLeft = screenPointBR.x - containerRect.left + menuMargin; let menuTop = screenPointTL.y - containerRect.top;
         const menuWidth = contextMenu.offsetWidth; const menuHeight = contextMenu.offsetHeight;
-        if (finalLeft + menuWidth > window.innerWidth) finalLeft = screenPointTL.x - menuWidth - menuMargin;
-        if (finalTop + menuHeight > window.innerHeight) finalTop = window.innerHeight - menuHeight - menuMargin;
-        if (finalTop < 0) finalTop = menuMargin;
-        contextMenu.style.left = `${finalLeft}px`; contextMenu.style.top = `${finalTop}px`;
+        if (menuLeft + menuWidth > containerRect.width) menuLeft = screenPointTL.x - containerRect.left - menuWidth - menuMargin;
+        if (menuTop + menuHeight > containerRect.height) menuTop = screenPointBR.y - containerRect.top - menuHeight;
+        if (menuTop < 0) menuTop = 0; if (menuLeft < 0) menuLeft = menuMargin;
+        contextMenu.style.left = `${menuLeft}px`; contextMenu.style.top = `${menuTop}px`;
         contextMenu.style.display = 'block'; ctxRemoveBtn.disabled = !selectedNodeData.parent;
     }
 
@@ -121,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         nodeEditInput.style.display = 'none';
         if (newName && newName !== oldName) {
             editingNodeData.data.name = newName;
-            renderMindmap(currentMindmapData); // Re-render to apply changes consistently
+            renderMindmap(currentMindmapData);
         } else {
              g.selectAll(".node").filter(d => d === editingNodeData).select("text.node-name").style('display', null);
         }
@@ -178,7 +183,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         console.log(`Fetching data for topic: ${topic}`);
         generateBtn.disabled = true; generateBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
         selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none';
-        isInitialRender = true; // Set flag for initial render
+        isInitialRender = true;
         try {
             const response = await fetch('/.netlify/functions/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic }), });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
@@ -193,48 +198,49 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         g.selectAll('*').remove(); contextMenu.style.display = 'none'; nodeEditInput.style.display = 'none';
         const root = d3.hierarchy(data); const layoutType = 'tree';
         let treeLayout = d3.tree().nodeSize([verticalNodeSeparation, horizontalLevelSeparation]); treeLayout(root);
+        let scale = 1, translateX = 0, translateY = 0;
 
-        // --- Centering & Scaling (Only on initial render) ---
         if (isInitialRender) {
             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
             root.each(d => { let x = d.y, y = d.x; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; });
             const treeWidth = maxX - minX; const treeHeight = maxY - minY;
-            const scale = Math.min(svgWidth / (treeWidth + 200), svgHeight / (treeHeight + 100), 1);
-            const translateX = (svgWidth - treeWidth * scale) / 2 - minX * scale;
-            const translateY = (svgHeight - treeHeight * scale) / 2 - minY * scale;
-
-            // Apply initial transform to group and zoom behavior
+            scale = Math.min(svgWidth / (treeWidth + 200), svgHeight / (treeHeight + 100), 1);
+            translateX = (svgWidth - treeWidth * scale) / 2 - minX * scale;
+            translateY = (svgHeight - treeHeight * scale) / 2 - minY * scale;
             const initialTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
             g.attr('transform', initialTransform);
-            svg.call(zoom.transform, initialTransform); // Set initial zoom state
-
-            isInitialRender = false; // Clear flag after initial render
+            svg.call(zoom.transform, initialTransform);
+            isInitialRender = false;
         }
 
-        // --- Draw Links ---
         g.selectAll(".link").data(root.links()).enter().append("path").attr("class", "link").attr("d", d3.linkHorizontal().x(node => node.y).y(node => node.x));
-
-        // --- Draw Nodes ---
         const node = g.selectAll(".node").data(root.descendants()).enter().append("g").attr("class", "node").attr("transform", d => `translate(${d.y},${d.x})`).on('click', function(event, d) { selectNode(event, d, this); }).on('dblclick', function(event, d) { event.stopPropagation(); contextMenu.style.display = 'none'; showNodeEditor(d, this); });
         node.insert("rect", ":first-child").attr("width", nodeRectWidth).attr("x", -nodeRectWidth / 2).attr("rx", 5).attr("ry", 5).style("stroke", "#aaa").style("stroke-width", "1px")
             .style("fill", d => { if (d.depth === 0) return "#f0e68c"; let ancestor = d; while (ancestor.depth > 1) ancestor = ancestor.parent; const categoryColorMap = { "Etiology": "#8dd3c7", "Risk Factors": "#ffffb3", "Pathogenesis": "#bebada", "Clinical Manifestations": "#fb8072", "Physical Examination": "#80b1d3", "Diagnostic Investigations": "#fdb462", "Management": "#b3de69" }; const categoryName = ancestor ? ancestor.data.name : d.data.name; return categoryColorMap[categoryName] || "#d9d9d9"; })
             .each(function(d) { const nodeGroup = this.parentNode; const textElement = d3.select(nodeGroup).select("text.node-name").node(); let contentHeight = 20; if (textElement) contentHeight = textElement.getBBox().height; const rectHeight = contentHeight + (nodePadding * 3); d3.select(this).attr("height", rectHeight).attr("y", -rectHeight / 2); });
+        // *** Reverted text rendering logic to use text-anchor: middle ***
         node.append("text").attr("class", "node-name").attr("dominant-baseline", "middle").attr("dy", "0em")
-            .style("text-anchor", "middle") .attr("x", 0) // Use middle anchor and x=0
+            .style("text-anchor", "middle") // Use middle anchor
+            .attr("x", 0) // Center horizontally at 0
             .style("font-size", d => d.depth === 0 ? "12px" : (d.depth === 1 ? "11px" : "10px")).style("font-weight", d => d.depth === 0 ? "bold" : "normal").text(d => d.data.name || d.data.topic || 'Root')
-            .call(wrapTextInsideNode, textWrapWidth); // Call wrap
+            .call(wrapTextInsideNode, textWrapWidth); // Call wrap (which includes vertical centering)
 
-        // --- Add Zoom/Pan Listeners (already attached earlier) ---
-        // svg.call(zoom).on("dblclick.zoom", null); // Already called
-
-        // --- Background Click Listener ---
         svg.on('click', function(event) { if (event.target === this) { if (selectedNodeElement) { d3.select(selectedNodeElement).select('rect').style('stroke', '#aaa').style('stroke-width', '1px'); } selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none'; hideNodeEditorAndSave(); } });
         console.log("Mindmap rendering complete.");
     }
 
     // --- Event Listeners ---
     generateBtn.addEventListener('click', () => { const topic = topicInput.value.trim(); if (topic) { fetchMindmapData(topic); } else { alert('Please enter a medical topic.'); } });
-    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) { const options = { filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'), backgroundColor: '#ffffff', scale: 8 }; if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); } else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } } else { alert("No mind map to export."); } });
+    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) {
+        const options = {
+            filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'),
+            backgroundColor: '#ffffff',
+            scale: 8,
+            embedFonts: true // Add embedFonts option
+        };
+        if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); }
+        else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } }
+        else { alert("No mind map to export."); } });
     ctxAddBtn.addEventListener('click', () => { if (selectedNodeData) addChildNode(); });
     ctxRemoveBtn.addEventListener('click', () => { if (selectedNodeData) removeNode(); });
     ctxExploreBtn.addEventListener('click', () => { if (selectedNodeData) exploreNode(); });
