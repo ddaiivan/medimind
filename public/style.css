@@ -1,0 +1,179 @@
+/* Global Styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    color: #333;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header Styles */
+.page-header {
+    background: linear-gradient(to bottom, #005a9e, #003f7e);
+    color: white;
+    padding: 30px 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.page-header h1 { margin: 0 0 10px 0; font-size: 2.5em; font-weight: 700; }
+.page-header p { margin: 0; font-size: 1.1em; opacity: 0.9; }
+
+/* Content Wrapper */
+.content-wrapper {
+    max-width: 1100px;
+    margin: 30px auto;
+    padding: 0 20px;
+    width: 95%;
+    box-sizing: border-box;
+}
+
+/* Disclaimer Box Styles */
+.disclaimer-box {
+    background-color: #fff3cd; border: 1px solid #ffeeba; border-left: 5px solid #ffc107;
+    padding: 15px 20px; margin-bottom: 30px; border-radius: 4px;
+    font-size: 0.9em; color: #664d03;
+}
+.disclaimer-box p {
+    margin: 5px 0;
+    text-align: justify; /* Add text justification */
+}
+
+/* Search Bar Styles */
+.search-bar {
+    display: flex; margin-bottom: 20px; /* Reduced margin */
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 4px; overflow: hidden;
+}
+.search-bar input[type="text"] {
+    flex-grow: 1; padding: 12px 15px; border: 1px solid #ced4da; border-right: none;
+    font-size: 1em; border-radius: 4px 0 0 4px; outline: none;
+}
+.search-bar input[type="text"]:focus { border-color: #86b7fe; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25); }
+.search-bar button { /* This is the main Search/Generate button */
+    padding: 12px 20px; background-color: #0d6efd; color: white; border: none;
+    cursor: pointer; font-size: 1em; border-radius: 0 4px 4px 0; transition: background-color 0.2s;
+    display: flex; align-items: center; gap: 8px;
+}
+.search-bar button:hover { background-color: #0b5ed7; }
+.search-bar button i { font-size: 0.9em; }
+
+/* Export Options Styles */
+.export-options {
+    margin-bottom: 20px;
+    text-align: right; /* Align button to the right */
+}
+
+/* Secondary Button Style (Used for Export PNG) */
+.secondary-button {
+    padding: 8px 15px;
+    background-color: #6c757d; /* Bootstrap secondary gray */
+    color: white;
+    border: 1px solid #6c757d;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+.secondary-button:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
+
+/* Mind Map Container Styles */
+.mindmap-container {
+    width: 100%; height: 65vh; min-height: 500px; border: 1px solid #ddd;
+    margin-bottom: 30px; position: relative; background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 4px;
+}
+#mindmapSvg { width: 100%; height: 100%; display: block; }
+
+/* D3 Node/Link Styles */
+.node { filter: drop-shadow( 2px 2px 1px rgba(0,0,0,0.15) ); cursor: pointer; }
+.node rect { stroke-width: 1px; }
+.node text { font-family: 'Roboto', sans-serif; fill: #333; pointer-events: none; }
+.link { fill: none; stroke: #adb5bd; stroke-width: 1.5px; }
+
+/* Context Menu Styles */
+.context-menu {
+    position: absolute; display: none; background-color: white;
+    border: 1px solid #ccc; border-radius: 4px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    padding: 5px; z-index: 10; min-width: 120px;
+}
+.context-menu button {
+    display: block; width: 100%; padding: 8px 12px; margin-bottom: 3px;
+    background-color: #fff; color: #333; border: none; text-align: left;
+    font-size: 0.9em; cursor: pointer; border-radius: 3px;
+    transition: background-color 0.15s ease-in-out;
+}
+.context-menu button:last-child { margin-bottom: 0; }
+.context-menu button:hover { background-color: #e7f1ff; } /* Light blue hover */
+.context-menu button:disabled { color: #aaa; cursor: not-allowed; background-color: #fff; }
+.context-menu button i {
+    margin-right: 8px; width: 14px; text-align: center;
+    color: #0d6efd; /* Match search button blue */
+}
+
+/* Node Edit Input Styles */
+.node-edit-input {
+    position: absolute; display: none; z-index: 11;
+    border: 1px solid #0d6efd; padding: 5px; font-family: 'Roboto', sans-serif;
+    font-size: 10px; box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+    outline: none; box-sizing: border-box;
+}
+
+/* --- Mobile Optimizations --- */
+@media (max-width: 600px) {
+    .page-header h1 {
+        font-size: 1.8em; /* Smaller header on mobile */
+    }
+    .page-header p {
+        font-size: 1em;
+    }
+
+    .search-bar {
+        flex-direction: column; /* Stack input and button */
+        margin-bottom: 15px;
+    }
+    .search-bar input[type="text"] {
+        border-radius: 4px 4px 0 0; /* Adjust border radius */
+        border-right: 1px solid #ced4da; /* Add back right border */
+        text-align: center;
+    }
+    .search-bar button {
+        border-radius: 0 0 4px 4px; /* Adjust border radius */
+        justify-content: center; /* Center icon and text */
+        padding: 10px; /* Adjust padding */
+    }
+    .search-bar button .button-text {
+        display: none; /* Hide "Search" text */
+    }
+    .search-bar button i {
+        margin-right: 0; /* Remove margin when text is hidden */
+        font-size: 1.1em;
+    }
+
+    .export-options {
+        text-align: center; /* Center export button */
+        margin-bottom: 15px;
+    }
+
+    .mindmap-container {
+        height: 55vh; /* Slightly reduce height */
+        min-height: 400px;
+    }
+
+    /* Make context menu slightly smaller */
+    .context-menu {
+        min-width: 110px;
+    }
+    .context-menu button {
+        padding: 6px 10px;
+        font-size: 0.85em;
+    }
+    .context-menu button i {
+        margin-right: 6px;
+    }
+}

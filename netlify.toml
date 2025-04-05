@@ -1,0 +1,14 @@
+# Netlify configuration file
+
+[build]
+  # Directory containing the deploy-ready HTML files and assets (relative to base)
+  publish = "public"
+  # Directory containing the serverless functions (relative to base)
+  functions = "netlify/functions"
+
+# Optional: Redirects/rewrites can be defined here if needed later
+# For example, to make the function available at /api/generate instead of /.netlify/functions/generate
+# [[redirects]]
+#  from = "/api/*"
+#  to = "/.netlify/functions/:splat"
+#  status = 200

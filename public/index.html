@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediMind</title> <!-- Updated Title -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Add Google Font (Roboto) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Include Font Awesome CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Include D3.js library -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Include save-svg-as-png library -->
+    <script src="https://cdn.jsdelivr.net/npm/save-svg-as-png@1.4.17/lib/saveSvgAsPng.min.js"></script>
+</head>
+<body>
+
+    <header class="page-header">
+        <h1>MediMind</h1> <!-- Updated H1 -->
+        <p>Generate mind maps for medical topics using GEMINI.</p> <!-- Updated Subtitle -->
+    </header>
+
+    <main class="content-wrapper">
+        <div class="disclaimer-box">
+            <p><strong>IMPORTANT DISCLAIMER:</strong></p>
+            <p>This tool generates mind maps based on AI interpretation for general informational purposes ONLY. It DOES NOT constitute medical advice, diagnosis, or treatment recommendation. Always consult with a qualified healthcare professional for any health concerns or before making any decisions related to your health or treatment.</p>
+        </div>
+
+        <div class="search-bar">
+            <input type="text" id="topicInput" placeholder="Enter disease or condition name...">
+            <button id="generateBtn">
+                <i class="fa-solid fa-magnifying-glass"></i> <span class="button-text">Search</span> <!-- Added span -->
+            </button>
+        </div>
+
+        <!-- Added Export Button Container -->
+        <div class="export-options" style="margin-bottom: 20px; text-align: right;">
+            <button id="exportPngBtn" class="secondary-button">Export PNG</button>
+             <!-- Add Export JSON etc. here later if needed -->
+        </div>
+
+        <div class="mindmap-container">
+            <svg id="mindmapSvg"></svg>
+            <!-- Context Menu Div (Hidden by default) -->
+            <div id="contextMenu" class="context-menu">
+                <button id="ctxAddBtn"><i class="fa-solid fa-plus"></i> Add Child</button>
+                <button id="ctxRemoveBtn"><i class="fa-solid fa-trash-can"></i> Remove</button>
+                <button id="ctxExploreBtn"><i class="fa-solid fa-magnifying-glass"></i> Explore</button>
+            </div>
+            <!-- Hidden input for inline node editing (Moved inside container) -->
+            <input type="text" id="nodeEditInput" class="node-edit-input" style="display: none;">
+        </div>
+
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>

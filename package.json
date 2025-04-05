@@ -1,0 +1,15 @@
+{
+  "name": "mindmap-maker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI Mind Map Generator using Gemini and D3.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.11.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
