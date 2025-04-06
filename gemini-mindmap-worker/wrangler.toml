@@ -1,0 +1,6 @@
+name = "gemini-mindmap-worker"
+main = "src/index.ts"
+compatibility_date = "2025-04-06"
+account_id = "5b654d85b71de6bf7a058fc7a81d2183"
+
+# Secrets section removed - attempting implicit binding

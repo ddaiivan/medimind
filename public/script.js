@@ -166,7 +166,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         ctxExploreBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Exploring...';
         console.log(`Exploring node: ${nodeName}, parent: ${parentContext}, root: ${rootContext}`);
         try {
-            const response = await fetch('/.netlify/functions/expand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodeName: nodeName, parentContext: parentContext, rootContext: rootContext }), });
+            const response = await fetch('https://gemini-mindmap-worker.daivanfebrijuansetiya.workers.dev/expand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodeName: nodeName, parentContext: parentContext, rootContext: rootContext }), });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
             // --- Updated response handling ---
             const expansionResult = await response.json();
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none';
         isInitialRender = true;
         try {
-            const response = await fetch('/.netlify/functions/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic }), });
+            const response = await fetch('https://gemini-mindmap-worker.daivanfebrijuansetiya.workers.dev/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic }), });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
             const data = await response.json();
             console.log('Received data:', data);
