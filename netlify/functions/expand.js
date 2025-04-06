@@ -36,12 +36,12 @@ export async function handler(event, context) {
         };
     }
 
-    let nodeName, parentContext, rootContext; // Added rootContext
+    let nodeName, parentContext, rootContext;
     try {
         const body = JSON.parse(event.body || '{}');
         nodeName = body.nodeName;
         parentContext = body.parentContext || "";
-        rootContext = body.rootContext || ""; // Get root context from request
+        rootContext = body.rootContext || "";
     } catch (e) {
         return {
             statusCode: 400,
@@ -61,8 +61,11 @@ export async function handler(event, context) {
     console.log(`Received expand request for node: "${nodeName}", parent: "${parentContext}", root: "${rootContext}"`);
 
     // --- Initialize Google AI ---
+    const modelName = "gemini-2.0-flash"; // Store model name
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({
+        model: modelName, // Use variable
+    });
 
     // --- Construct the Prompt for Expansion with Full Context (English) ---
     const prompt = `
@@ -76,7 +79,7 @@ Output ONLY the JSON array, starting with '[' and ending with ']'. Do not includ
 
     // --- Call Gemini API ---
     try {
-        console.log("Sending expand request to Gemini API...");
+        console.log(`Sending expand request to Gemini API (Model: ${modelName})...`);
         const generationConfig = { temperature: 0.6 };
         const safetySettings = [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -87,12 +90,7 @@ Output ONLY the JSON array, starting with '[' and ending with ']'. Do not includ
 
         const result = await model.generateContent(prompt, generationConfig, safetySettings);
         const response = result.response;
-
-        if (!response) {
-            console.error("Gemini API returned no response for expand request.");
-            throw new Error("No response received from AI model.");
-        }
-
+        if (!response) { throw new Error("No response received from AI model."); }
         const text = response.text();
         console.log("Raw expand response text from Gemini:", text);
 
@@ -100,52 +98,39 @@ Output ONLY the JSON array, starting with '[' and ending with ']'. Do not includ
         let jsonArray;
         try {
             const cleanedText = text.replace(/^```json\s*|```$/g, '').trim();
-            if (!cleanedText.startsWith('[') || !cleanedText.endsWith(']')) {
-                 throw new Error("AI response is not a JSON array.");
-            }
+            if (!cleanedText.startsWith('[') || !cleanedText.endsWith(']')) { throw new Error("AI response is not a JSON array."); }
             jsonArray = JSON.parse(cleanedText);
-            if (!Array.isArray(jsonArray)) {
-                throw new Error("Parsed AI response is not an array.");
-            }
+            if (!Array.isArray(jsonArray)) { throw new Error("Parsed AI response is not an array."); }
             jsonArray = jsonArray.filter(item => item && typeof item.name === 'string');
-
         } catch (parseError) {
             console.error("Failed to parse Gemini expand response as JSON array:", parseError);
             console.error("Raw text was:", text);
             const arrayMatch = text.match(/\[[\s\S]*\]/);
             if (arrayMatch) {
-                try {
-                    jsonArray = JSON.parse(arrayMatch[0]);
-                    if (!Array.isArray(jsonArray)) throw new Error("Retry parsed data is not an array.");
-                    jsonArray = jsonArray.filter(item => item && typeof item.name === 'string');
-                    console.log("Successfully parsed array after extracting block.");
-                } catch (retryParseError) {
-                     console.error("Retry parsing array also failed:", retryParseError);
-                     throw new Error("AI response was not a valid JSON array.");
-                }
-            } else {
-                 console.warn("AI response did not contain a recognizable JSON array structure. Returning empty array.");
-                 jsonArray = [];
-            }
+                try { jsonArray = JSON.parse(arrayMatch[0]); if (!Array.isArray(jsonArray)) throw new Error("Retry parsed data is not an array."); jsonArray = jsonArray.filter(item => item && typeof item.name === 'string'); console.log("Successfully parsed array after extracting block."); }
+                catch (retryParseError) { console.error("Retry parsing array also failed:", retryParseError); throw new Error("AI response was not a valid JSON array."); }
+            } else { console.warn("AI response did not contain a recognizable JSON array structure. Returning empty array."); jsonArray = []; }
         }
 
-        // --- Send Response to Frontend ---
+        // --- Send Response to Frontend (Include model info) ---
+        const responseBody = {
+            nodes: jsonArray,
+            _modelUsed: modelName // Add model name here
+        };
         console.log("Successfully parsed JSON array, sending to frontend.");
         return {
             statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-            body: JSON.stringify(jsonArray), // Send the array back
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify(responseBody), // Send the object containing nodes and model info
         };
 
     } catch (error) {
         console.error("Error calling Gemini API or processing expand response:", error);
+        const errorMessage = error.message.includes(modelName) ? error.message : `Failed to expand node using model ${modelName}: ${error.message}`;
         return {
             statusCode: 500,
             headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-            body: JSON.stringify({ error: `Failed to expand node: ${error.message}` }),
+            body: JSON.stringify({ error: errorMessage }),
         };
     }
 }

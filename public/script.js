@@ -53,11 +53,9 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         const words = text.text().split(/\s+/).reverse();
         let word; let line = []; let lineNumber = 0;
         const lineHeight = 1.1; const dy = parseFloat(text.attr("dy") || 0);
-        text.attr("y", null).text(null); // Clear y and text
-        // Set text-anchor middle and x=0 here for default centering
+        text.attr("y", null).text(null);
         text.style("text-anchor", "middle").attr("x", 0);
-
-        let tspan = text.append("tspan").attr("x", 0).attr("dy", dy + "em"); // x=0 relative to centered text element
+        let tspan = text.append("tspan").attr("x", 0).attr("dy", dy + "em");
         while (word = words.pop()) {
           line.push(word); tspan.text(line.join(" "));
           if (tspan.node().getComputedTextLength() > width && line.length > 1) {
@@ -66,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
             lineNumber++;
           }
         }
-        // Vertical centering based on lines
         const lines = lineNumber + 1;
         text.attr("y", -( (lines - 1) * lineHeight / 2 ) + "em" );
       });
@@ -171,7 +168,13 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         try {
             const response = await fetch('/.netlify/functions/expand', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nodeName: nodeName, parentContext: parentContext, rootContext: rootContext }), });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
-            const newChildren = await response.json(); console.log('Received expansion:', newChildren);
+            // --- Updated response handling ---
+            const expansionResult = await response.json();
+            const newChildren = expansionResult.nodes; // Get nodes from the response object
+            const modelUsed = expansionResult._modelUsed; // Get model info
+            console.log(`Expanded using model: ${modelUsed}`);
+            console.log('Received expansion:', newChildren);
+            // --- End of update ---
             if (newChildren && newChildren.length > 0) { if (!selectedNodeData.data.children) selectedNodeData.data.children = []; newChildren.forEach(child => { if (!child.children) child.children = []; selectedNodeData.data.children.push(child); }); renderMindmap(currentMindmapData); }
             else { alert(`No additional sub-points found for "${nodeName}".`); }
         } catch (error) { console.error('Error exploring node:', error); alert(`Failed to explore node: ${error.message}`); }
@@ -187,7 +190,16 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         try {
             const response = await fetch('/.netlify/functions/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic }), });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
-            const data = await response.json(); console.log('Received data:', data); if (!data.children) data.children = []; currentMindmapData = data; renderMindmap(currentMindmapData);
+            const data = await response.json();
+            console.log('Received data:', data);
+            // --- Log model used ---
+            if (data._modelUsed) {
+                console.log(`Generated using model: ${data._modelUsed}`);
+            }
+            // --- End log ---
+            if (!data.children) data.children = [];
+            currentMindmapData = data;
+            renderMindmap(currentMindmapData);
         } catch (error) { console.error('Error fetching or processing mind map data:', error); alert(`Error generating mind map: ${error.message}`); }
         finally { generateBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Search'; generateBtn.disabled = false; }
     }
@@ -218,29 +230,17 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         node.insert("rect", ":first-child").attr("width", nodeRectWidth).attr("x", -nodeRectWidth / 2).attr("rx", 5).attr("ry", 5).style("stroke", "#aaa").style("stroke-width", "1px")
             .style("fill", d => { if (d.depth === 0) return "#f0e68c"; let ancestor = d; while (ancestor.depth > 1) ancestor = ancestor.parent; const categoryColorMap = { "Etiology": "#8dd3c7", "Risk Factors": "#ffffb3", "Pathogenesis": "#bebada", "Clinical Manifestations": "#fb8072", "Physical Examination": "#80b1d3", "Diagnostic Investigations": "#fdb462", "Management": "#b3de69" }; const categoryName = ancestor ? ancestor.data.name : d.data.name; return categoryColorMap[categoryName] || "#d9d9d9"; })
             .each(function(d) { const nodeGroup = this.parentNode; const textElement = d3.select(nodeGroup).select("text.node-name").node(); let contentHeight = 20; if (textElement) contentHeight = textElement.getBBox().height; const rectHeight = contentHeight + (nodePadding * 3); d3.select(this).attr("height", rectHeight).attr("y", -rectHeight / 2); });
-        // *** Reverted text rendering logic to use text-anchor: middle ***
         node.append("text").attr("class", "node-name").attr("dominant-baseline", "middle").attr("dy", "0em")
-            .style("text-anchor", "middle") // Use middle anchor
-            .attr("x", 0) // Center horizontally at 0
+            .style("text-anchor", "middle") .attr("x", 0)
             .style("font-size", d => d.depth === 0 ? "12px" : (d.depth === 1 ? "11px" : "10px")).style("font-weight", d => d.depth === 0 ? "bold" : "normal").text(d => d.data.name || d.data.topic || 'Root')
-            .call(wrapTextInsideNode, textWrapWidth); // Call wrap (which includes vertical centering)
-
+            .call(wrapTextInsideNode, textWrapWidth);
         svg.on('click', function(event) { if (event.target === this) { if (selectedNodeElement) { d3.select(selectedNodeElement).select('rect').style('stroke', '#aaa').style('stroke-width', '1px'); } selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none'; hideNodeEditorAndSave(); } });
         console.log("Mindmap rendering complete.");
     }
 
     // --- Event Listeners ---
     generateBtn.addEventListener('click', () => { const topic = topicInput.value.trim(); if (topic) { fetchMindmapData(topic); } else { alert('Please enter a medical topic.'); } });
-    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) {
-        const options = {
-            filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'),
-            backgroundColor: '#ffffff',
-            scale: 8,
-            embedFonts: true // Add embedFonts option
-        };
-        if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); }
-        else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } }
-        else { alert("No mind map to export."); } });
+    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) { const options = { filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'), backgroundColor: '#ffffff', scale: 8, embedFonts: true }; if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); } else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } } else { alert("No mind map to export."); } });
     ctxAddBtn.addEventListener('click', () => { if (selectedNodeData) addChildNode(); });
     ctxRemoveBtn.addEventListener('click', () => { if (selectedNodeData) removeNode(); });
     ctxExploreBtn.addEventListener('click', () => { if (selectedNodeData) exploreNode(); });

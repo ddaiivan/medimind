@@ -29,7 +29,6 @@ export async function handler(event, context) {
     }
 
     // --- Get API Key and Topic ---
-    // Netlify injects environment variables into process.env
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         console.error("GEMINI_API_KEY environment variable not set.");
@@ -42,7 +41,6 @@ export async function handler(event, context) {
 
     let topic;
     try {
-        // Request body is available in event.body (needs parsing)
         const body = JSON.parse(event.body || '{}');
         topic = body.topic;
     } catch (e) {
@@ -64,9 +62,10 @@ export async function handler(event, context) {
     console.log(`Received request for topic: ${topic}`);
 
     // --- Initialize Google AI ---
+    const modelName = "gemini-2.0-flash"; // Store model name
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash-latest", // Use the flash model as requested
+        model: modelName, // Use variable
     });
 
     // --- Construct the Prompt (English) ---
@@ -78,73 +77,22 @@ The JSON object MUST follow this exact structure:
 {
   "topic": "The main topic name in English (e.g., ${topic})",
   "children": [
-    {
-      "name": "Etiology", // Main category in English
-      "children": [ // Array for sub-points of Etiology
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Bacterial: Streptococcus pneumoniae" }, { "name": "Viral: Influenza" }
-      ]
-    },
-    {
-      "name": "Risk Factors", // Main category in English
-      "children": [ // Array for sub-points of Risk Factors
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Smoking" }, { "name": "Immunosuppression" }
-      ]
-    },
-    {
-      "name": "Pathogenesis", // Main category in English
-      "children": [
-         // Populate this array with objects, each having ONLY a "name" property in English. Keep concise.
-         // Example: { "name": "Pathogen entry (Inhalation/Aspiration)" }, { "name": "Alveolar inflammation" }
-      ]
-    },
-    {
-      "name": "Clinical Manifestations", // Main category in English
-      "children": [
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Cough (Productive/Non-productive)" }, { "name": "Fever / Chills" }
-      ]
-    },
-    {
-      "name": "Physical Examination", // Main category in English
-      "children": [
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Crackles on auscultation" }, { "name": "Tachypnea" }
-      ]
-    },
-    {
-      "name": "Diagnostic Investigations", // Main category in English
-      "children": [
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Chest X-ray (Infiltrates/Consolidation)" }, { "name": "Sputum Culture" }
-      ]
-    },
-    {
-      "name": "Management", // Main category in English
-      "children": [
-        // Populate this array with objects, each having ONLY a "name" property in English.
-        // Example: { "name": "Antibiotics (if bacterial)" }, { "name": "Supportive Care (Oxygen, Fluids)" }
-      ]
-    }
+    { "name": "Etiology", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Risk Factors", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Pathogenesis", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Clinical Manifestations", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Physical Examination", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Diagnostic Investigations", "children": [ /* { "name": "Sub-point..." } */ ] },
+    { "name": "Management", "children": [ /* { "name": "Sub-point..." } */ ] }
   ]
 }
-
-CRITICAL INSTRUCTIONS:
-1.  The output MUST be ONLY the JSON object described above. All text values ("topic", "name") MUST be in English.
-2.  Each main category object MUST contain a "children" array.
-3.  Populate the "children" array with objects representing the key sub-points for that category.
-4.  Each sub-point object inside the "children" array MUST have ONLY a "name" property with a concise English description.
-5.  ABSOLUTELY DO NOT include a "details" property anywhere in the JSON output.
-6.  If a main category has no logical sub-points, its "children" array MUST be empty ([]).
+CRITICAL INSTRUCTIONS: Output ONLY the JSON object. Populate children arrays. Use English. No 'details' property. Empty children array ([]) if no sub-points.
 `;
 
     // --- Call Gemini API ---
     try {
-        console.log("Sending request to Gemini API...");
-        const generationConfig = {
-            temperature: 0.7,
-        };
+        console.log(`Sending request to Gemini API (Model: ${modelName})...`);
+        const generationConfig = { temperature: 0.7 };
         const safetySettings = [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
             { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -154,12 +102,7 @@ CRITICAL INSTRUCTIONS:
 
         const result = await model.generateContent(prompt, generationConfig, safetySettings);
         const response = result.response;
-
-        if (!response) {
-            console.error("Gemini API returned no response.");
-            throw new Error("No response received from AI model.");
-        }
-
+        if (!response) { throw new Error("No response received from AI model."); }
         const text = response.text();
         console.log("Raw response text from Gemini:", text);
 
@@ -173,38 +116,30 @@ CRITICAL INSTRUCTIONS:
             console.error("Raw text was:", text);
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
-                try {
-                    jsonData = JSON.parse(jsonMatch[0]);
-                    console.log("Successfully parsed after extracting JSON block.");
-                } catch (retryParseError) {
-                     console.error("Retry parsing also failed:", retryParseError);
-                     throw new Error("AI response was not valid JSON.");
-                }
-            } else {
-                 throw new Error("AI response did not contain a recognizable JSON structure.");
-            }
+                try { jsonData = JSON.parse(jsonMatch[0]); console.log("Successfully parsed after extracting JSON block."); }
+                catch (retryParseError) { console.error("Retry parsing also failed:", retryParseError); throw new Error("AI response was not valid JSON."); }
+            } else { throw new Error("AI response did not contain a recognizable JSON structure."); }
         }
+
+        // Add debug info
+        jsonData._modelUsed = modelName;
 
         // --- Send Response to Frontend ---
         console.log("Successfully parsed JSON, sending to frontend.");
         return {
             statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*', // Crucial for the browser to accept the response
-            },
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify(jsonData),
         };
 
     } catch (error) {
         console.error("Error calling Gemini API or processing response:", error);
+        // Include model name in error if possible
+        const errorMessage = error.message.includes(modelName) ? error.message : `Failed to generate mind map using model ${modelName}: ${error.message}`;
         return {
             statusCode: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*',
-            },
-            body: JSON.stringify({ error: `Failed to generate mind map: ${error.message}` }),
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({ error: errorMessage }),
         };
     }
 }
