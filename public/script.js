@@ -208,39 +208,215 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         if (!data) { g.selectAll('*').remove(); selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none'; return; }
         console.log("Rendering mindmap...");
         g.selectAll('*').remove(); contextMenu.style.display = 'none'; nodeEditInput.style.display = 'none';
-        const root = d3.hierarchy(data); const layoutType = 'tree';
-        let treeLayout = d3.tree().nodeSize([verticalNodeSeparation, horizontalLevelSeparation]); treeLayout(root);
-        let scale = 1, translateX = 0, translateY = 0;
 
-        if (isInitialRender) {
-            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-            root.each(d => { let x = d.y, y = d.x; if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; });
-            const treeWidth = maxX - minX; const treeHeight = maxY - minY;
-            scale = Math.min(svgWidth / (treeWidth + 200), svgHeight / (treeHeight + 100), 1);
-            translateX = (svgWidth - treeWidth * scale) / 2 - minX * scale;
-            translateY = (svgHeight - treeHeight * scale) / 2 - minY * scale;
-            const initialTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-            g.attr('transform', initialTransform);
-            svg.call(zoom.transform, initialTransform);
-            isInitialRender = false;
+        const originalRoot = d3.hierarchy(data);
+        const nodes = originalRoot.descendants();
+        const links = originalRoot.links();
+        const nodeById = new Map(nodes.map(d => [d.data, d])); // Map original data object to hierarchy node
+
+        // --- Start: Symmetrical Left-Right Layout ---
+        if (originalRoot.children && originalRoot.children.length > 0) {
+            const firstLevelChildren = originalRoot.children;
+            const midPoint = Math.ceil(firstLevelChildren.length / 2);
+            const leftChildrenData = firstLevelChildren.slice(0, midPoint).map(c => c.data);
+            const rightChildrenData = firstLevelChildren.slice(midPoint).map(c => c.data);
+
+            const treeLayout = d3.tree().nodeSize([verticalNodeSeparation, horizontalLevelSeparation]);
+
+            // Function to calculate layout for a subtree
+            const layoutSubtree = (childrenData) => {
+                if (!childrenData || childrenData.length === 0) return { nodes: [], links: [] };
+                // Create a temporary root for layout calculation
+                const tempRootData = { name: "__temp_root__", children: childrenData };
+                const tempHierarchy = d3.hierarchy(tempRootData);
+                treeLayout(tempHierarchy);
+                // Exclude the temporary root from results, adjust depth
+                const subtreeNodes = tempHierarchy.descendants().slice(1).map(n => {
+                    n.depth -= 1; // Adjust depth relative to original root
+                    return n;
+                });
+                const subtreeLinks = tempHierarchy.links(); // Links within the subtree
+                return { nodes: subtreeNodes, links: subtreeLinks };
+            };
+
+            // Layout left and right subtrees independently
+            const leftLayout = layoutSubtree(leftChildrenData);
+            const rightLayout = layoutSubtree(rightChildrenData);
+
+            // Reset original node positions (except root)
+            nodes.forEach(n => { if (n !== originalRoot) { n.x = undefined; n.y = undefined; }});
+
+            // Position root node
+            originalRoot.x = 0;
+            originalRoot.y = 0;
+            originalRoot.side = 'center';
+
+            // Apply calculated positions back to original hierarchy nodes
+            leftLayout.nodes.forEach(tempNode => {
+                const originalNode = nodeById.get(tempNode.data);
+                if (originalNode) {
+                    originalNode.x = tempNode.x; // Use calculated vertical position
+                    originalNode.y = -tempNode.y - horizontalLevelSeparation; // Negate and offset horizontal
+                    originalNode.side = 'left';
+                }
+            });
+            rightLayout.nodes.forEach(tempNode => {
+                const originalNode = nodeById.get(tempNode.data);
+                if (originalNode) {
+                    originalNode.x = tempNode.x; // Use calculated vertical position
+                    originalNode.y = tempNode.y + horizontalLevelSeparation; // Offset horizontal
+                    originalNode.side = 'right';
+                }
+            });
+
+            // --- Prepare links ---
+            const allLinks = [];
+            // Links from root to first level
+            firstLevelChildren.forEach(child => {
+                allLinks.push({ source: originalRoot, target: child });
+            });
+            // Links within left subtree
+            leftLayout.links.forEach(link => {
+                const source = nodeById.get(link.source.data);
+                const target = nodeById.get(link.target.data);
+                if (source && target) allLinks.push({ source, target });
+            });
+            // Links within right subtree
+            rightLayout.links.forEach(link => {
+                const source = nodeById.get(link.source.data);
+                const target = nodeById.get(link.target.data);
+                if (source && target) allLinks.push({ source, target });
+            });
+
+            // --- Adjust Initial Centering ---
+            let scale = 1, translateX = 0, translateY = 0;
+            if (isInitialRender) {
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                nodes.forEach(d => { // Use the updated positions on original nodes
+                    if (d.y < minX) minX = d.y;
+                    if (d.y > maxX) maxX = d.y;
+                    if (d.x < minY) minY = d.x;
+                    if (d.x > maxY) maxY = d.x;
+                });
+                minX -= nodeRectWidth / 2; maxX += nodeRectWidth / 2;
+                minY -= 50; maxY += 50;
+                const treeWidth = maxX - minX; const treeHeight = maxY - minY;
+                const scaleX = treeWidth > 0 ? svgWidth / treeWidth : 1;
+                const scaleY = treeHeight > 0 ? svgHeight / treeHeight : 1;
+                scale = Math.min(scaleX, scaleY, 1);
+                translateX = (svgWidth - treeWidth * scale) / 2 - minX * scale;
+                translateY = (svgHeight - treeHeight * scale) / 2 - minY * scale;
+                const initialTransform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+                g.attr('transform', initialTransform);
+                svg.call(zoom.transform, initialTransform);
+                isInitialRender = false;
+            }
+
+            // --- Draw Links ---
+            g.selectAll(".link")
+             .data(allLinks) // Use combined links
+             .enter().append("path")
+             .attr("class", "link")
+             .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x)); // Link generator uses node objects
+
+            // --- Draw Nodes ---
+            const node = g.selectAll(".node")
+                          .data(nodes) // Use original nodes with updated positions
+                          .enter().append("g")
+                          .attr("class", "node")
+                          .attr("transform", d => `translate(${d.y},${d.x})`)
+                          .on('click', function(event, d) { selectNode(event, d, this); })
+                          .on('dblclick', function(event, d) { event.stopPropagation(); contextMenu.style.display = 'none'; showNodeEditor(d, this); });
+
+            // Draw rectangles
+            node.insert("rect", ":first-child")
+                .attr("width", nodeRectWidth)
+                .attr("x", -nodeRectWidth / 2)
+                .attr("rx", 5).attr("ry", 5)
+                .style("stroke", "#aaa").style("stroke-width", "1px")
+                .style("fill", d => {
+                    if (d.depth === 0) return "#f0e68c";
+                    let ancestor = d;
+                    while (ancestor.depth > 1) ancestor = ancestor.parent;
+                    const categoryColorMap = { "Etiology": "#8dd3c7", "Risk Factors": "#ffffb3", "Pathogenesis": "#bebada", "Clinical Manifestations": "#fb8072", "Physical Examination": "#80b1d3", "Diagnostic Investigations": "#fdb462", "Management": "#b3de69" };
+                    const categoryName = ancestor ? ancestor.data.name : d.data.name;
+                    return categoryColorMap[categoryName] || "#d9d9d9";
+                });
+
+            // Draw text
+            node.append("text")
+                .attr("class", "node-name")
+                .attr("dominant-baseline", "middle")
+                .attr("dy", "0em")
+                .style("text-anchor", "middle")
+                .attr("x", 0)
+                .style("font-size", d => d.depth === 0 ? "12px" : (d.depth === 1 ? "11px" : "10px"))
+                .style("font-weight", d => d.depth === 0 ? "bold" : "normal")
+                .text(d => d.data.name || d.data.topic || 'Root')
+                .call(wrapTextInsideNode, textWrapWidth);
+
+            // Adjust rectangle height
+            node.each(function(d) {
+                const nodeGroup = d3.select(this);
+                const textElement = nodeGroup.select("text.node-name").node();
+                let contentHeight = 20;
+                if (textElement) contentHeight = textElement.getBBox().height;
+                const rectHeight = contentHeight + (nodePadding * 3);
+                nodeGroup.select("rect").attr("height", rectHeight).attr("y", -rectHeight / 2);
+            });
+
+        } else {
+            // Handle case with only a root node or no children
+            originalRoot.x = svgHeight / 2; // Center vertically
+            originalRoot.y = svgWidth / 2;  // Center horizontally
+            g.attr('transform', `translate(${originalRoot.y}, ${originalRoot.x})`); // Apply transform to group
+
+            const node = g.selectAll(".node")
+                          .data([originalRoot])
+                          .enter().append("g")
+                          .attr("class", "node")
+                          // No translate here as group is already translated
+                          .on('click', function(event, d) { selectNode(event, d, this); })
+                          .on('dblclick', function(event, d) { event.stopPropagation(); contextMenu.style.display = 'none'; showNodeEditor(d, this); });
+
+            node.insert("rect", ":first-child")
+                .attr("width", nodeRectWidth)
+                .attr("x", -nodeRectWidth / 2)
+                .attr("rx", 5).attr("ry", 5)
+                .style("stroke", "#aaa").style("stroke-width", "1px")
+                .style("fill", "#f0e68c");
+
+            node.append("text")
+                .attr("class", "node-name")
+                .attr("dominant-baseline", "middle")
+                .attr("dy", "0em")
+                .style("text-anchor", "middle")
+                .attr("x", 0)
+                .style("font-size", "12px").style("font-weight", "bold")
+                .text(d => d.data.name || d.data.topic || 'Root')
+                .call(wrapTextInsideNode, textWrapWidth);
+
+             node.each(function(d) {
+                const nodeGroup = d3.select(this);
+                const textElement = nodeGroup.select("text.node-name").node();
+                let contentHeight = 20;
+                if (textElement) contentHeight = textElement.getBBox().height;
+                const rectHeight = contentHeight + (nodePadding * 3);
+                nodeGroup.select("rect").attr("height", rectHeight).attr("y", -rectHeight / 2);
+            });
+             isInitialRender = false; // Still need to set this
         }
+        // --- End: Symmetrical Left-Right Layout ---
 
-        g.selectAll(".link").data(root.links()).enter().append("path").attr("class", "link").attr("d", d3.linkHorizontal().x(node => node.y).y(node => node.x));
-        const node = g.selectAll(".node").data(root.descendants()).enter().append("g").attr("class", "node").attr("transform", d => `translate(${d.y},${d.x})`).on('click', function(event, d) { selectNode(event, d, this); }).on('dblclick', function(event, d) { event.stopPropagation(); contextMenu.style.display = 'none'; showNodeEditor(d, this); });
-        node.insert("rect", ":first-child").attr("width", nodeRectWidth).attr("x", -nodeRectWidth / 2).attr("rx", 5).attr("ry", 5).style("stroke", "#aaa").style("stroke-width", "1px")
-            .style("fill", d => { if (d.depth === 0) return "#f0e68c"; let ancestor = d; while (ancestor.depth > 1) ancestor = ancestor.parent; const categoryColorMap = { "Etiology": "#8dd3c7", "Risk Factors": "#ffffb3", "Pathogenesis": "#bebada", "Clinical Manifestations": "#fb8072", "Physical Examination": "#80b1d3", "Diagnostic Investigations": "#fdb462", "Management": "#b3de69" }; const categoryName = ancestor ? ancestor.data.name : d.data.name; return categoryColorMap[categoryName] || "#d9d9d9"; })
-            .each(function(d) { const nodeGroup = this.parentNode; const textElement = d3.select(nodeGroup).select("text.node-name").node(); let contentHeight = 20; if (textElement) contentHeight = textElement.getBBox().height; const rectHeight = contentHeight + (nodePadding * 3); d3.select(this).attr("height", rectHeight).attr("y", -rectHeight / 2); });
-        node.append("text").attr("class", "node-name").attr("dominant-baseline", "middle").attr("dy", "0em")
-            .style("text-anchor", "middle") .attr("x", 0)
-            .style("font-size", d => d.depth === 0 ? "12px" : (d.depth === 1 ? "11px" : "10px")).style("font-weight", d => d.depth === 0 ? "bold" : "normal").text(d => d.data.name || d.data.topic || 'Root')
-            .call(wrapTextInsideNode, textWrapWidth);
+
         svg.on('click', function(event) { if (event.target === this) { if (selectedNodeElement) { d3.select(selectedNodeElement).select('rect').style('stroke', '#aaa').style('stroke-width', '1px'); } selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none'; hideNodeEditorAndSave(); } });
         console.log("Mindmap rendering complete.");
     }
 
+
     // --- Event Listeners ---
     generateBtn.addEventListener('click', () => { const topic = topicInput.value.trim(); if (topic) { fetchMindmapData(topic); } else { alert('Please enter a medical topic.'); } });
-    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) { const options = { filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'), backgroundColor: '#ffffff', scale: 8, embedFonts: true }; if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); } else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } } else { alert("No mind map to export."); } });
+    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) { const options = { filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'), backgroundColor: '#ffffff', scale: 18, embedFonts: true }; if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); } else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } } else { alert("No mind map to export."); } });
     ctxAddBtn.addEventListener('click', () => { if (selectedNodeData) addChildNode(); });
     ctxRemoveBtn.addEventListener('click', () => { if (selectedNodeData) removeNode(); });
     ctxExploreBtn.addEventListener('click', () => { if (selectedNodeData) exploreNode(); });
