@@ -16,6 +16,8 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <!-- Include save-svg-as-png library -->
     <script src="https://cdn.jsdelivr.net/npm/save-svg-as-png@1.4.17/lib/saveSvgAsPng.min.js"></script>
+    <!-- Include dom-to-image-more library -->
+    <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.1.6/dist/dom-to-image-more.min.js"></script>
 </head>
 <body>
 
@@ -39,8 +41,10 @@
 
         <!-- Added Export Button Container -->
         <div class="export-options" style="margin-bottom: 20px; text-align: right;">
-            <button id="exportPngBtn" class="secondary-button">Export PNG</button>
-            <p class="export-warning">Tip: For best results, use a PC/Laptop to export PNG.</p> <!-- Added Warning -->
+            <button id="exportPngBtn" class="secondary-button desktop-only">Export PNG</button>
+            <button id="exportPngMobileBtn" class="secondary-button mobile-only">Export PNG for Mobile</button>
+            <p class="export-warning desktop-only">Tip: For best results, use a PC/Laptop to export PNG.</p>
+            <p class="export-warning mobile-only">Optimized for mobile devices</p>
         </div>
 
         <div class="mindmap-container">

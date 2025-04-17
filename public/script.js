@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
     const generateBtn = document.getElementById('generateBtn');
     const mindmapSvg = d3.select('#mindmapSvg');
     const exportPngBtn = document.getElementById('exportPngBtn');
+    const exportPngMobileBtn = document.getElementById('exportPngMobileBtn');
     const mindmapContainer = document.querySelector('.mindmap-container');
     const contextMenu = document.getElementById('contextMenu');
     const ctxAddBtn = document.getElementById('ctxAddBtn');
@@ -13,9 +14,256 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
     const nodeEditInput = document.getElementById('nodeEditInput');
 
     if (!topicInput || !generateBtn || !mindmapSvg.node() || !mindmapContainer || !exportPngBtn ||
-        !contextMenu || !ctxAddBtn || !ctxRemoveBtn || !ctxExploreBtn || !nodeEditInput) {
+        !contextMenu || !ctxAddBtn || !ctxRemoveBtn || !ctxExploreBtn || !nodeEditInput || !exportPngMobileBtn) {
         console.error("One or more essential DOM elements not found!");
         return;
+    }
+
+    // --- Helper: Check if device is mobile ---
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // --- Mobile Export Helper ---
+    async function exportMobilePng() {
+        const svgElement = document.getElementById('mindmapSvg');
+        if (!svgElement || !currentMindmapData) {
+            alert("No mind map to export.");
+            return;
+        }
+
+        // Show loading indicator
+        const loadingEl = document.createElement('div');
+        loadingEl.className = 'loading-indicator';
+        loadingEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating high-quality PNG...';
+        document.body.appendChild(loadingEl);
+
+        try {
+            console.log('Starting mobile export process...');
+            
+            // Dapatkan semua node dalam mindmap
+            const nodes = svgElement.querySelectorAll('.node');
+            if (nodes.length === 0) {
+                document.body.removeChild(loadingEl);
+                alert("No nodes found in the mindmap.");
+                return;
+            }
+            
+            // Dapatkan grup utama dan transformasi
+            const gElement = svgElement.querySelector('g');
+            
+            // Membuat SVG baru yang akan digunakan untuk export
+            const svgNS = "http://www.w3.org/2000/svg";
+            const exportSvg = document.createElementNS(svgNS, "svg");
+            
+            // Salin atribut dari SVG asli yang diperlukan
+            exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            exportSvg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+            
+            // Salin gaya CSS yang diperlukan
+            const style = document.createElementNS(svgNS, "style");
+            style.textContent = `
+                .node rect { stroke: #aaa; stroke-width: 1px; }
+                .node text { font-family: Arial, sans-serif; text-anchor: middle; fill: #333; }
+                .link { fill: none; stroke: #adb5bd; stroke-width: 1.5px; }
+                text { font-family: Arial, sans-serif; }
+            `;
+            exportSvg.appendChild(style);
+            
+            // Tambahkan semua konten SVG ke SVG baru
+            const clonedG = gElement.cloneNode(true);
+            
+            // Reset transformasi pada grup untuk capture seluruh content
+            clonedG.removeAttribute("transform");
+            exportSvg.appendChild(clonedG);
+            
+            // Cari bounds dari seluruh node untuk menentukan viewBox
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            
+            nodes.forEach(node => {
+                const rect = node.querySelector('rect');
+                const nodeTransform = node.getAttribute('transform');
+                let nodeX = 0, nodeY = 0;
+                
+                if (nodeTransform) {
+                    const translateMatch = nodeTransform.match(/translate\(([^,]+),([^)]+)\)/);
+                    if (translateMatch && translateMatch[1] && translateMatch[2]) {
+                        nodeX = parseFloat(translateMatch[1]);
+                        nodeY = parseFloat(translateMatch[2]);
+                    }
+                }
+                
+                if (rect) {
+                    const width = parseFloat(rect.getAttribute('width'));
+                    const height = parseFloat(rect.getAttribute('height'));
+                    const x = parseFloat(rect.getAttribute('x') || 0);
+                    const y = parseFloat(rect.getAttribute('y') || 0);
+                    
+                    // Hitung posisi absolut dari node
+                    const left = nodeX + x;
+                    const right = nodeX + x + width;
+                    const top = nodeY + y;
+                    const bottom = nodeY + y + height;
+                    
+                    minX = Math.min(minX, left);
+                    maxX = Math.max(maxX, right);
+                    minY = Math.min(minY, top);
+                    maxY = Math.max(maxY, bottom);
+                }
+            });
+            
+            // Tambahkan padding
+            const padding = 50;
+            minX -= padding;
+            minY -= padding;
+            maxX += padding;
+            maxY += padding;
+            
+            // Set dimensi SVG
+            const width = maxX - minX;
+            const height = maxY - minY;
+            exportSvg.setAttribute("width", width.toString());
+            exportSvg.setAttribute("height", height.toString());
+            exportSvg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+            
+            // Tambahkan background putih
+            const background = document.createElementNS(svgNS, "rect");
+            background.setAttribute("x", minX.toString());
+            background.setAttribute("y", minY.toString());
+            background.setAttribute("width", width.toString());
+            background.setAttribute("height", height.toString());
+            background.setAttribute("fill", "white");
+            exportSvg.insertBefore(background, exportSvg.firstChild);
+            
+            // Konversi SVG ke string
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(exportSvg);
+            
+            // Konversi ke Blob untuk image
+            const svgBlob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+            
+            // Gunakan method yang lebih sederhana dan langsung
+            const DOMURL = window.URL || window.webkitURL || window;
+            const url = DOMURL.createObjectURL(svgBlob);
+            
+            const downloadImage = new Image();
+            downloadImage.width = width;
+            downloadImage.height = height;
+            
+            downloadImage.onload = function() {
+                const canvas = document.createElement('canvas');
+                const scale = 2; // Gunakan scale yang sama dengan web untuk konsistensi
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.scale(scale, scale);
+                ctx.drawImage(downloadImage, 0, 0);
+                
+                // Simpan sebagai PNG
+                const filename = (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_');
+                
+                // Cara yang lebih kompatibel untuk mobile
+                canvas.toBlob((blob) => {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${filename}_mobile.png`;
+                    
+                    // iOS Safari workaround
+                    if (navigator.userAgent.match(/ipad|ipod|iphone/i)) {
+                        a.target = '_blank';
+                        a.rel = 'noopener noreferrer';
+                        
+                        // Tambahan untuk iOS - gunakan data URL langsung
+                        const reader = new FileReader();
+                        reader.onload = function() {
+                            const dataUrl = reader.result;
+                            const img = document.createElement('img');
+                            img.src = dataUrl;
+                            
+                            // Buat div untuk tampilan preview
+                            const previewDiv = document.createElement('div');
+                            previewDiv.className = 'image-preview-container';
+                            previewDiv.style.position = 'fixed';
+                            previewDiv.style.top = '0';
+                            previewDiv.style.left = '0';
+                            previewDiv.style.right = '0';
+                            previewDiv.style.bottom = '0';
+                            previewDiv.style.backgroundColor = 'rgba(0,0,0,0.8)';
+                            previewDiv.style.zIndex = '10000';
+                            previewDiv.style.display = 'flex';
+                            previewDiv.style.flexDirection = 'column';
+                            previewDiv.style.alignItems = 'center';
+                            previewDiv.style.justifyContent = 'center';
+                            previewDiv.style.padding = '20px';
+                            
+                            img.style.maxWidth = '100%';
+                            img.style.maxHeight = '80%';
+                            img.style.objectFit = 'contain';
+                            
+                            const infoText = document.createElement('p');
+                            infoText.style.color = 'white';
+                            infoText.style.margin = '20px 0';
+                            infoText.textContent = 'Press and hold image to save';
+                            
+                            const closeBtn = document.createElement('button');
+                            closeBtn.textContent = 'Close';
+                            closeBtn.style.padding = '10px 20px';
+                            closeBtn.style.backgroundColor = '#0d6efd';
+                            closeBtn.style.color = 'white';
+                            closeBtn.style.border = 'none';
+                            closeBtn.style.borderRadius = '4px';
+                            closeBtn.style.marginTop = '20px';
+                            
+                            closeBtn.onclick = function() {
+                                document.body.removeChild(previewDiv);
+                                document.body.removeChild(loadingEl);
+                            };
+                            
+                            previewDiv.appendChild(img);
+                            previewDiv.appendChild(infoText);
+                            previewDiv.appendChild(closeBtn);
+                            document.body.appendChild(previewDiv);
+                            
+                            // Cleanup
+                            URL.revokeObjectURL(downloadUrl);
+                            URL.revokeObjectURL(url);
+                        };
+                        reader.readAsDataURL(blob);
+                    } else {
+                        // Android dan browser lain
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        
+                        // Cleanup untuk non-iOS
+                        setTimeout(() => {
+                            URL.revokeObjectURL(downloadUrl);
+                            URL.revokeObjectURL(url);
+                            document.body.removeChild(loadingEl);
+                        }, 200);
+                    }
+                }, 'image/png', 0.95);
+            };
+            
+            downloadImage.onerror = function(err) {
+                console.error('Error loading SVG for export:', err);
+                alert('Failed to export. Please try again.');
+                URL.revokeObjectURL(url);
+                document.body.removeChild(loadingEl);
+            };
+            
+            downloadImage.src = url;
+            
+        } catch (error) {
+            console.error('Mobile export failed:', error);
+            alert('Failed to export PNG: ' + (error.message || 'Unknown error'));
+            document.body.removeChild(loadingEl);
+        }
     }
 
     // --- D3 Setup ---
@@ -416,7 +664,183 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
 
     // --- Event Listeners ---
     generateBtn.addEventListener('click', () => { const topic = topicInput.value.trim(); if (topic) { fetchMindmapData(topic); } else { alert('Please enter a medical topic.'); } });
-    exportPngBtn.addEventListener('click', () => { const svgElement = document.getElementById('mindmapSvg'); if (svgElement && currentMindmapData) { const options = { filename: (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_'), backgroundColor: '#ffffff', scale: 18, embedFonts: true }; if (typeof saveSvgAsPng !== 'undefined') { saveSvgAsPng(svgElement, `${options.filename}.png`, options); } else { console.error("saveSvgAsPng library not loaded."); alert("Error exporting PNG: Library not found."); } } else { alert("No mind map to export."); } });
+    
+    // Mengganti handler exportPngBtn untuk perbaikan tampilan yang terpotong
+    exportPngBtn.addEventListener('click', () => { 
+        const svgElement = document.getElementById('mindmapSvg'); 
+        if (!svgElement || !currentMindmapData) { 
+            alert("No mind map to export."); 
+            return; 
+        }
+        
+        // Tampilkan loading indicator
+        const loadingEl = document.createElement('div');
+        loadingEl.className = 'loading-indicator';
+        loadingEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating high-quality PNG...';
+        document.body.appendChild(loadingEl);
+        
+        try {
+            // Dapatkan semua node dalam mindmap
+            const nodes = svgElement.querySelectorAll('.node');
+            if (nodes.length === 0) {
+                document.body.removeChild(loadingEl);
+                alert("No nodes found in the mindmap.");
+                return;
+            }
+            
+            // Dapatkan grup utama dan transformasi
+            const gElement = svgElement.querySelector('g');
+            
+            // Membuat SVG baru yang akan digunakan untuk export
+            const svgNS = "http://www.w3.org/2000/svg";
+            const exportSvg = document.createElementNS(svgNS, "svg");
+            
+            // Salin atribut dari SVG asli yang diperlukan
+            exportSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+            exportSvg.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+            
+            // Salin gaya CSS yang diperlukan
+            const style = document.createElementNS(svgNS, "style");
+            style.textContent = `
+                .node rect { stroke: #aaa; stroke-width: 1px; }
+                .node text { font-family: Arial, sans-serif; text-anchor: middle; fill: #333; }
+                .link { fill: none; stroke: #adb5bd; stroke-width: 1.5px; }
+                text { font-family: Arial, sans-serif; }
+            `;
+            exportSvg.appendChild(style);
+            
+            // Tambahkan semua konten SVG ke SVG baru
+            const clonedG = gElement.cloneNode(true);
+            
+            // Reset transformasi pada grup untuk capture seluruh content
+            clonedG.removeAttribute("transform");
+            exportSvg.appendChild(clonedG);
+            
+            // Cari bounds dari seluruh node untuk menentukan viewBox
+            let minX = Infinity, minY = Infinity;
+            let maxX = -Infinity, maxY = -Infinity;
+            
+            nodes.forEach(node => {
+                const rect = node.querySelector('rect');
+                const nodeTransform = node.getAttribute('transform');
+                let nodeX = 0, nodeY = 0;
+                
+                if (nodeTransform) {
+                    const translateMatch = nodeTransform.match(/translate\(([^,]+),([^)]+)\)/);
+                    if (translateMatch && translateMatch[1] && translateMatch[2]) {
+                        nodeX = parseFloat(translateMatch[1]);
+                        nodeY = parseFloat(translateMatch[2]);
+                    }
+                }
+                
+                if (rect) {
+                    const width = parseFloat(rect.getAttribute('width'));
+                    const height = parseFloat(rect.getAttribute('height'));
+                    const x = parseFloat(rect.getAttribute('x') || 0);
+                    const y = parseFloat(rect.getAttribute('y') || 0);
+                    
+                    // Hitung posisi absolut dari node
+                    const left = nodeX + x;
+                    const right = nodeX + x + width;
+                    const top = nodeY + y;
+                    const bottom = nodeY + y + height;
+                    
+                    minX = Math.min(minX, left);
+                    maxX = Math.max(maxX, right);
+                    minY = Math.min(minY, top);
+                    maxY = Math.max(maxY, bottom);
+                }
+            });
+            
+            // Tambahkan padding
+            const padding = 50;
+            minX -= padding;
+            minY -= padding;
+            maxX += padding;
+            maxY += padding;
+            
+            // Set dimensi SVG
+            const width = maxX - minX;
+            const height = maxY - minY;
+            exportSvg.setAttribute("width", width.toString());
+            exportSvg.setAttribute("height", height.toString());
+            exportSvg.setAttribute("viewBox", `${minX} ${minY} ${width} ${height}`);
+            
+            // Tambahkan background putih
+            const background = document.createElementNS(svgNS, "rect");
+            background.setAttribute("x", minX.toString());
+            background.setAttribute("y", minY.toString());
+            background.setAttribute("width", width.toString());
+            background.setAttribute("height", height.toString());
+            background.setAttribute("fill", "white");
+            exportSvg.insertBefore(background, exportSvg.firstChild);
+            
+            // Konversi SVG ke string
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(exportSvg);
+            
+            // Konversi ke base64 untuk image
+            const svgBlob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+            
+            // Gunakan method yang lebih sederhana dan langsung
+            const DOMURL = window.URL || window.webkitURL || window;
+            const url = DOMURL.createObjectURL(svgBlob);
+            
+            const downloadImage = new Image();
+            downloadImage.width = width;
+            downloadImage.height = height;
+            
+            downloadImage.onload = function() {
+                const canvas = document.createElement('canvas');
+                const scale = 2; // Menurunkan scale agar kompatibel di semua device
+                canvas.width = width * scale;
+                canvas.height = height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.scale(scale, scale);
+                ctx.drawImage(downloadImage, 0, 0);
+                
+                // Simpan sebagai PNG
+                const filename = (currentMindmapData.topic || 'mindmap').replace(/\s+/g, '_');
+                
+                // Cara 1: Download langsung
+                canvas.toBlob((blob) => {
+                    const downloadUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = `${filename}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // Cleanup
+                    setTimeout(() => {
+                        URL.revokeObjectURL(downloadUrl);
+                        URL.revokeObjectURL(url);
+                        document.body.removeChild(loadingEl);
+                    }, 200);
+                }, 'image/png', 0.95);
+            };
+            
+            downloadImage.onerror = function(err) {
+                console.error('Error loading SVG for export:', err);
+                alert('Failed to export. Please try again.');
+                URL.revokeObjectURL(url);
+                document.body.removeChild(loadingEl);
+            };
+            
+            downloadImage.src = url;
+            
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Failed to export PNG: ' + (error.message || 'Unknown error'));
+            document.body.removeChild(loadingEl);
+        }
+    });
+    
+    exportPngMobileBtn.addEventListener('click', () => { exportMobilePng(); });
     ctxAddBtn.addEventListener('click', () => { if (selectedNodeData) addChildNode(); });
     ctxRemoveBtn.addEventListener('click', () => { if (selectedNodeData) removeNode(); });
     ctxExploreBtn.addEventListener('click', () => { if (selectedNodeData) exploreNode(); });

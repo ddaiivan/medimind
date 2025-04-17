@@ -135,8 +135,25 @@ body {
     outline: none; box-sizing: border-box;
 }
 
+/* Mobile/Desktop visibility classes */
+.desktop-only {
+    display: block;
+}
+
+.mobile-only {
+    display: none;
+}
+
 /* --- Mobile Optimizations --- */
 @media (max-width: 600px) {
+    .desktop-only {
+        display: none;
+    }
+    
+    .mobile-only {
+        display: block;
+    }
+    
     .page-header h1 { font-size: 1.8em; }
     .page-header p { font-size: 1em; }
 
