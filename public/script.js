@@ -436,7 +436,18 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         selectedNodeData = null; selectedNodeElement = null; contextMenu.style.display = 'none';
         isInitialRender = true;
         try {
-            const response = await fetch('https://gemini-mindmap-worker.daivanfebrijuansetiya.workers.dev/generate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: topic }), });
+            // --- Get the state of the includeDetails checkbox ---
+            const includeDetailsCheckbox = document.getElementById('includeDetailsCheckbox');
+            const includeDetails = includeDetailsCheckbox ? includeDetailsCheckbox.checked : true; // Default to true if not found
+            console.log(`Sending request with includeDetails: ${includeDetails}`);
+            // --- End get state ---
+
+            const response = await fetch('https://gemini-mindmap-worker.daivanfebrijuansetiya.workers.dev/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // --- Include includeDetails in the request body ---
+                body: JSON.stringify({ topic: topic, includeDetails: includeDetails }),
+            });
             if (!response.ok) { const errorData = await response.json(); throw new Error(errorData.error || `HTTP error! status: ${response.status}`); }
             const data = await response.json();
             console.log('Received data:', data);
@@ -460,13 +471,23 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
         const originalRoot = d3.hierarchy(data);
         const nodes = originalRoot.descendants();
         const links = originalRoot.links();
-        const nodeById = new Map(nodes.map(d => [d.data, d])); // Map original data object to hierarchy node
+            const nodeById = new Map(nodes.map(d => [d.data, d])); // Map original data object to hierarchy node
 
-        // --- Start: Symmetrical Left-Right Layout ---
-        if (originalRoot.children && originalRoot.children.length > 0) {
-            const firstLevelChildren = originalRoot.children;
-            const midPoint = Math.ceil(firstLevelChildren.length / 2);
-            const leftChildrenData = firstLevelChildren.slice(0, midPoint).map(c => c.data);
+            // --- Start: Symmetrical Left-Right Layout ---
+            if (originalRoot.children && originalRoot.children.length > 0) {
+                const firstLevelChildren = originalRoot.children;
+
+                // --- Define Color Palette & Map First Level Children to Colors ---
+                const branchColors = ["#8dd3c7", "#ffffb3", "#bebada", "#fb8072", "#80b1d3", "#fdb462", "#b3de69", "#fccde5", "#d9d9d9", "#bc80bd", "#ccebc5", "#ffed6f"]; // Expanded palette slightly
+                const firstLevelColorMap = new Map();
+                firstLevelChildren.forEach((child, index) => {
+                    // Use child.data as key because the 'd' in style function refers to hierarchy node which has .data
+                    firstLevelColorMap.set(child.data, branchColors[index % branchColors.length]);
+                });
+                // --- End Color Mapping ---
+
+                const midPoint = Math.ceil(firstLevelChildren.length / 2);
+                const leftChildrenData = firstLevelChildren.slice(0, midPoint).map(c => c.data);
             const rightChildrenData = firstLevelChildren.slice(midPoint).map(c => c.data);
 
             const treeLayout = d3.tree().nodeSize([verticalNodeSeparation, horizontalLevelSeparation]);
@@ -583,12 +604,18 @@ document.addEventListener('DOMContentLoaded', () => { // Wait for DOM to be read
                 .attr("rx", 5).attr("ry", 5)
                 .style("stroke", "#aaa").style("stroke-width", "1px")
                 .style("fill", d => {
-                    if (d.depth === 0) return "#f0e68c";
-                    let ancestor = d;
-                    while (ancestor.depth > 1) ancestor = ancestor.parent;
-                    const categoryColorMap = { "Etiology": "#8dd3c7", "Risk Factors": "#ffffb3", "Pathogenesis": "#bebada", "Clinical Manifestations": "#fb8072", "Physical Examination": "#80b1d3", "Diagnostic Investigations": "#fdb462", "Management": "#b3de69" };
-                    const categoryName = ancestor ? ancestor.data.name : d.data.name;
-                    return categoryColorMap[categoryName] || "#d9d9d9";
+                    if (d.depth === 0) return "#f0e68c"; // Root color
+
+                    // Find the ancestor at depth 1 (the first-level child)
+                    let firstLevelAncestor = d;
+                    while (firstLevelAncestor.depth > 1) {
+                        firstLevelAncestor = firstLevelAncestor.parent;
+                    }
+
+                    // Get color from the map using the ancestor's data object as the key
+                    // Use d.data if the node itself is a first-level child
+                    const ancestorData = firstLevelAncestor ? firstLevelAncestor.data : d.data;
+                    return firstLevelColorMap.get(ancestorData) || "#d9d9d9"; // Default to gray if not found
                 });
 
             // Draw text

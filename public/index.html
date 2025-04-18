@@ -32,12 +32,22 @@
             <p>This tool generates mind maps based on AI interpretation for general informational purposes ONLY. It DOES NOT constitute medical advice, diagnosis, or treatment recommendation. Always consult with a qualified healthcare professional for any health concerns or before making any decisions related to your health or treatment.</p>
         </div>
 
-        <div class="search-bar">
-            <input type="text" id="topicInput" placeholder="Enter disease or condition name...">
-            <button id="generateBtn">
-                <i class="fa-solid fa-magnifying-glass"></i> <span class="button-text">Search</span> <!-- Added span -->
-            </button>
+        <!-- Added Search Controls Group Wrapper -->
+        <div class="search-controls-group">
+            <div class="search-bar">
+                <input type="text" id="topicInput" placeholder="Enter disease or condition name...">
+                <button id="generateBtn">
+                    <i class="fa-solid fa-magnifying-glass"></i> <span class="button-text">Search</span> <!-- Added span -->
+                </button>
+            </div>
+
+            <!-- Details Toggle is now inside the group -->
+            <div class="details-toggle">
+              <input type="checkbox" id="includeDetailsCheckbox" name="includeDetails" checked>
+              <label for="includeDetailsCheckbox">Include Details (Etiology, etc.)</label>
+            </div>
         </div>
+        <!-- End Search Controls Group Wrapper -->
 
         <!-- Added Export Button Container -->
         <div class="export-options" style="margin-bottom: 20px; text-align: right;">

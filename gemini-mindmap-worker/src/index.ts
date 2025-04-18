@@ -99,6 +99,10 @@ async function handleGenerate(
 	corsHeaders: HeadersInit
 ): Promise<Response> {
 	const topic = body.topic;
+	// --- Extract includeDetails flag (default to true if missing) ---
+	const includeDetails = typeof body.includeDetails === 'boolean' ? body.includeDetails : true;
+	// --- End extraction ---
+
 	if (!topic || typeof topic !== 'string' || topic.trim() === '') {
 		return new Response(JSON.stringify({ error: "Bad Request: 'topic' is required in the request body." }), {
 			status: 400,
@@ -106,9 +110,12 @@ async function handleGenerate(
 		});
 	}
 
-	console.log(`Received generate request for topic: ${topic}`);
+	console.log(`Received generate request for topic: ${topic}, includeDetails: ${includeDetails}`);
 
-	const prompt = `
+	// --- Dynamically construct the prompt based on includeDetails ---
+	let prompt = "";
+	if (includeDetails) {
+		prompt = `
 Generate a detailed hierarchical mind map structure in English for the medical topic: "${topic}".
 The output MUST be ONLY a valid JSON object. Do NOT include any text before or after the JSON object. Do NOT use markdown formatting like \`\`\`json.
 
@@ -125,16 +132,36 @@ The JSON object MUST follow this exact structure:
     { "name": "Management", "children": [ /* { "name": "Sub-point..." } */ ] }
   ]
 }
-CRITICAL INSTRUCTIONS: Output ONLY the JSON object. Populate children arrays. Use English. No 'details' property. Empty children array ([]) if no sub-points.
+CRITICAL INSTRUCTIONS: Output ONLY the JSON object. Populate children arrays with relevant sub-points. Use English. No 'details' property. Empty children array ([]) if no sub-points.
 `;
+	} else {
+		prompt = `
+Generate a basic hierarchical mind map structure in English for the medical topic: "${topic}".
+Focus on the main concepts and hierarchy. EXCLUDE detailed medical sections like Etiology, Risk Factors, Pathogenesis, Clinical Manifestations, Physical Examination, Diagnostic Investigations, and Management unless they are the primary topic itself.
+The output MUST be ONLY a valid JSON object. Do NOT include any text before or after the JSON object. Do NOT use markdown formatting like \`\`\`json.
+
+The JSON object MUST follow this structure:
+{
+  "topic": "The main topic name in English (e.g., ${topic})",
+  "children": [
+    /* { "name": "Main Sub-Concept 1", "children": [...] }, */
+    /* { "name": "Main Sub-Concept 2", "children": [...] } */
+  ]
+}
+CRITICAL INSTRUCTIONS: Output ONLY the JSON object. Populate children arrays with relevant main sub-concepts ONLY. Use English. No 'details' property. Empty children array ([]) if no sub-points. Do NOT include the specific detailed sections mentioned above (Etiology, Management, etc.).
+`;
+	}
+	// --- End dynamic prompt construction ---
 
 	try {
 		console.log(`Sending generate request to Gemini API (Model: ${modelName})...`);
+		// --- Corrected model.generateContent call ---
 		const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig,
             safetySettings
         });
+		// --- End correction ---
 
 		// Handle potential lack of response or blocked content
         if (!result.response) {

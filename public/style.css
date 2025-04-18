@@ -41,9 +41,20 @@ body {
     text-align: justify; /* Add text justification */
 }
 
+/* --- Added: Search Controls Group --- */
+.search-controls-group {
+    margin-bottom: 25px; /* Keep the overall bottom margin */
+    max-width: 700px; /* Constrain width on desktop */
+    margin-left: auto; /* Center the group */
+    margin-right: auto; /* Center the group */
+}
+/* --- End Added --- */
+
 /* Search Bar Styles */
 .search-bar {
-    display: flex; margin-bottom: 20px; /* Reduced margin */
+    display: flex;
+    align-items: center; /* Added for vertical alignment */
+    /* margin-bottom: 25px; */ /* Margin moved to parent group */
     box-shadow: 0 1px 3px rgba(0,0,0,0.1); border-radius: 4px; overflow: hidden;
 }
 .search-bar input[type="text"] {
@@ -59,10 +70,93 @@ body {
 .search-bar button:hover { background-color: #0b5ed7; }
 .search-bar button i { font-size: 0.9em; }
 
+/* --- Updated: Details Toggle Styles (Now a Switch) --- */
+.details-toggle {
+    display: flex; /* Keep as flex for switch alignment */
+    align-items: center;
+    margin-top: 8px; /* Reduced margin from search bar for tighter grouping */
+    /* margin-bottom: 5px; */ /* Removed, margin is on parent group */
+    padding-left: 5px; /* Add slight left padding for alignment within group */
+    font-size: 0.9em;
+    color: #555;
+    cursor: pointer; /* Make the whole area clickable */
+    position: relative; /* Needed for switch positioning */
+    -webkit-user-select: none; /* Prevent text selection */
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Hide default checkbox */
+.details-toggle input[type="checkbox"] {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+/* Style the label to act as the switch track and text */
+.details-toggle label {
+    cursor: pointer;
+    padding-left: 50px; /* Space for the switch */
+    position: relative;
+    display: inline-block;
+    line-height: 20px; /* Match switch height */
+}
+
+/* Create the switch track using label's pseudo-element */
+.details-toggle label::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px; /* Switch width */
+    height: 20px; /* Switch height */
+    background-color: #ccc;
+    border-radius: 10px; /* Rounded track */
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Create the switch knob using label's pseudo-element */
+.details-toggle label::after {
+    content: "";
+    position: absolute;
+    left: 2px; /* Initial position inside track */
+    top: 2px;
+    width: 16px; /* Knob size */
+    height: 16px;
+    background-color: white;
+    border-radius: 50%; /* Circular knob */
+    transition: transform 0.2s ease-in-out;
+}
+
+/* Change track color and move knob when checked */
+.details-toggle input[type="checkbox"]:checked + label::before {
+    background-color: #0d6efd; /* Active color (match search button) */
+}
+
+.details-toggle input[type="checkbox"]:checked + label::after {
+    transform: translateX(20px); /* Move knob to the right (track width - knob width - 2*offset) */
+}
+
+/* Focus style for accessibility */
+.details-toggle input[type="checkbox"]:focus + label::before {
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.5);
+}
+/* --- End Updated --- */
+
 /* Export Options Styles */
 .export-options {
-    margin-bottom: 20px;
-    text-align: right; /* Align button to the right */
+    display: flex; /* Changed to flex */
+    justify-content: space-between; /* Added */
+    align-items: center; /* Added */
+    margin-bottom: 25px; /* Increased margin */
+    padding: 0 5px; /* Add slight horizontal padding for breathing room */
+    box-sizing: border-box;
+    max-width: 700px; /* Constrain width on desktop */
+    margin-left: auto; /* Center the group */
+    margin-right: auto; /* Center the group */
+    /* text-align: right; */ /* Removed */
 }
 
 /* Secondary Button Style (Used for Export PNG) */
@@ -157,14 +251,67 @@ body {
     .page-header h1 { font-size: 1.8em; }
     .page-header p { font-size: 1em; }
 
-    .search-bar { flex-direction: column; margin-bottom: 15px; }
-    .search-bar input[type="text"] { border-radius: 4px 4px 0 0; border-right: 1px solid #ced4da; text-align: center; }
-    .search-bar button { border-radius: 0 0 4px 4px; justify-content: center; padding: 10px; }
+    .search-bar {
+        flex-direction: column;
+        margin-bottom: 20px; /* Slightly increased mobile margin */
+        align-items: stretch; /* Make children stretch full width */
+    }
+    .search-bar input[type="text"] {
+        border-radius: 4px 4px 0 0;
+        border-right: 1px solid #ced4da;
+        text-align: center;
+        padding: 14px 15px; /* Increased vertical padding */
+        font-size: 1.1em; /* Slightly larger font */
+        min-height: 2.5em; /* Ensure minimum height */
+        box-sizing: border-box; /* Include padding in height */
+    }
+    .search-bar button {
+        border-radius: 0 0 4px 4px;
+        justify-content: center;
+        padding: 12px; /* Slightly increased padding */
+        min-height: 2.8em; /* Ensure minimum height consistent with input */
+        box-sizing: border-box;
+    }
     .search-bar button .button-text { display: none; }
-    .search-bar button i { margin-right: 0; font-size: 1.1em; }
+    .search-bar button i { margin-right: 0; font-size: 1.2em; } /* Slightly larger icon */
 
-    .export-options { text-align: center; margin-bottom: 15px; }
-    .export-warning { display: block; margin: 5px 0 0 0; text-align: center;} /* Stack warning below button */
+    /* --- Mobile Search Controls Group --- */
+    /* Reset max-width and centering for mobile */
+    .search-controls-group {
+        max-width: none;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    /* --- Mobile Details Toggle Styles --- */
+    /* The main .details-toggle styles apply, just need centering */
+    .search-controls-group .details-toggle { /* Target specifically within the group */
+        justify-content: center; /* Center the switch and label */
+        margin-top: 15px; /* Adjust top margin for mobile */
+        margin-bottom: 0; /* Remove bottom margin, parent group has it */
+        padding-left: 0; /* Remove desktop padding */
+    }
+
+    .export-options {
+        /* text-align: center; */ /* Removed */
+        display: flex; /* Added */
+        flex-direction: column; /* Added */
+        align-items: center; /* Added */
+        margin-bottom: 20px; /* Increased margin */
+        max-width: none; /* Reset max-width for mobile */
+        margin-left: 0;
+        margin-right: 0;
+        padding: 0; /* Reset desktop padding */
+    }
+     .export-options .secondary-button {
+        padding: 10px 18px; /* Slightly larger export button */
+        font-size: 1em;
+    }
+    .export-warning {
+        display: block;
+        margin: 8px 0 0 0; /* Adjusted margin-top */
+        text-align: center;
+    } /* Stack warning below button */
 
     .mindmap-container { height: 55vh; min-height: 400px; }
 
